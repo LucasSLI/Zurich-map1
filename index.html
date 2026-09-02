@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zürich Tech Research Agenda 2026 – Interaktive Karte</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        day1: '#3b82f6', // Di - Blue
+                        day2: '#10b981', // Mi - Emerald
+                        day3: '#f59e0b', // Do - Amber
+                        day4: '#ec4899', // Fr - Pink
+                        hotel: '#8b5cf6', // Purple
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .leaflet-popup-content-wrapper {
+            background-color: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);
+            padding: 4px;
+        }
+        .leaflet-popup-tip {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+        }
+        .leaflet-container {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #090d16;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="h-full text-slate-200 flex flex-col font-sans overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-slate-950 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-30 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-bold text-xl">
+                <i class="fa-solid fa-compass"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                    Zürich Tech Research Agenda
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">15. – 18. Sept 2026</span>
+                </h1>
+                <p class="text-xs text-slate-400">DefenceTech · FoodTech · PerformanceTech · MobilityTech · Deep Tech</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="btn-toggle-route" onclick="toggleRoutes()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-route text-blue-400"></i>
+                <span id="route-btn-text">Routenlinien ausblenden</span>
+            </button>
+            <button onclick="openModal('modal-tips')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition flex items-center gap-2">
+                <i class="fa-solid fa-lightbulb text-indigo-400"></i>
+                <span>Scouting & Logistik-Tipps</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Sidebar / Locations List -->
+        <aside class="w-full md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col z-20 shrink-0 max-h-[45vh] md:max-h-none border-b md:border-b-0">
+            
+            <!-- Filters Section -->
+            <div class="p-3 border-b border-slate-800 space-y-2.5 bg-slate-900/90 backdrop-blur">
+                <!-- Day Pills Filter -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                    <button onclick="filterDay('all')" id="pill-all" class="day-pill active px-3 py-1.5 rounded-lg font-semibold bg-blue-600 text-white whitespace-nowrap transition">
+                        Alle Tage
+                    </button>
+                    <button onclick="filterDay('di')" id="pill-di" class="day-pill px-3 py-1.5 rounded-lg font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition border border-slate-700">
+                        <span class="w-2 h-2 rounded-full inline-block bg-blue-500 mr-1"></span> Di 15.
+                    </button>
+                    <button onclick="filterDay('mi')" id="pill-mi" class="day-pill px-3 py-1.5 rounded-lg font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition border border-slate-700">
+                        <span class="w-2 h-2 rounded-full inline-block bg-emerald-500 mr-1"></span> Mi 16.
+                    </button>
+                    <button onclick="filterDay('do')" id="pill-do" class="day-pill px-3 py-1.5 rounded-lg font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition border border-slate-700">
+                        <span class="w-2 h-2 rounded-full inline-block bg-amber-500 mr-1"></span> Do 17.
+                    </button>
+                    <button onclick="filterDay('fr')" id="pill-fr" class="day-pill px-3 py-1.5 rounded-lg font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition border border-slate-700">
+                        <span class="w-2 h-2 rounded-full inline-block bg-pink-500 mr-1"></span> Fr 18.
+                    </button>
+                </div>
+
+                <!-- Search & Category -->
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+                        <input type="text" id="search-input" onkeyup="renderLocations()" placeholder="Ort, Cluster, Adresse suchen..." 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition">
+                    </div>
+                    <select id="category-filter" onchange="renderLocations()" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+                        <option value="all">Alle Cluster</option>
+                        <option value="Base & Logistik">Hotel & Logistics</option>
+                        <option value="Deep Tech">Deep Tech / AI</option>
+                        <option value="Big Tech Scouting">Big Tech / Google</option>
+                        <option value="PerformanceTech">PerformanceTech</option>
+                        <option value="Community & Events">Meetups & Community</option>
+                        <option value="Cleantech / Energy">Cleantech & Energy</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Locations Counter -->
+            <div class="px-3 py-1.5 bg-slate-950/50 border-b border-slate-800 text-[11px] text-slate-400 flex justify-between items-center">
+                <span id="location-count">18 Orte gelistet</span>
+                <span class="text-slate-500">Klick für Kartenzoom</span>
+            </div>
+
+            <!-- Locations List Scrollable -->
+            <div id="locations-list" class="flex-1 overflow-y-auto divide-y divide-slate-800/60">
+                <!-- JS populated -->
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="flex-1 relative h-full">
+            <div id="map" class="w-full h-full z-10"></div>
+
+            <!-- Map Controls Overlay (Quick View Reset) -->
+            <div class="absolute bottom-6 right-6 z-20 flex flex-col gap-2">
+                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 p-2.5 rounded-xl border border-slate-700 shadow-xl backdrop-blur transition flex items-center gap-2 text-xs font-medium">
+                    <i class="fa-solid fa-expand text-blue-400"></i>
+                    <span class="hidden sm:inline">Gesamtansicht</span>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Location Detail Modal / Slide-over -->
+    <div id="modal-detail" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-800 flex items-start justify-between bg-slate-950/50">
+                <div class="flex items-center gap-3">
+                    <div id="modal-icon-bg" class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                        <i id="modal-icon" class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div>
+                        <span id="modal-day-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">--</span>
+                        <h2 id="modal-title" class="text-base font-bold text-white mt-0.5">Location Title</h2>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-detail')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed">
+                <div>
+                    <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Zeit & Ort</h3>
+                    <p id="modal-time" class="text-slate-200 font-semibold text-sm mb-1"><i class="fa-regular fa-clock text-blue-400 mr-1.5"></i> --</p>
+                    <p id="modal-address" class="text-slate-300"><i class="fa-solid fa-map-pin text-rose-400 mr-1.5"></i> --</p>
+                </div>
+
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+                    <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Focus & Agenda</h3>
+                    <p id="modal-focus" class="text-slate-200">--</p>
+                </div>
+
+                <div id="modal-notes-container" class="bg-blue-950/20 p-3.5 rounded-xl border border-blue-900/30">
+                    <h3 class="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-eye mr-1"></i> Scouting & ÖV Tipp</h3>
+                    <p id="modal-notes" class="text-slate-300">--</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between gap-3">
+                <a id="modal-gmaps-link" href="#" target="_blank" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition text-center flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    <span>In Google Maps öffnen</span>
+                </a>
+                <button onclick="closeModal('modal-detail')" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+                    Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logistics & Tips Modal -->
+    <div id="modal-tips" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-clipboard-check text-indigo-400 text-xl"></i>
+                    <h2 class="text-base font-bold text-white">Logistik & Scouting-Guide Zürich 2026</h2>
+                </div>
+                <button onclick="closeModal('modal-tips')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
+                <!-- ÖV Cluster -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="font-bold text-white text-sm mb-2 text-indigo-400 flex items-center gap-2">
+                        <i class="fa-solid fa-train-subway"></i> ÖV & Logistik-Cluster
+                    </h3>
+                    <ul class="space-y-1.5 list-disc list-inside text-slate-300">
+                        <li><strong class="text-white">Hotel-Cluster (Moxy Altstetten/Letzigrund):</strong> Ideal für Zürich-West (Technopark, Toni-Areal, On Hardturm, Impact Hub). Tram 2/3 direkt vor der Tür.</li>
+                        <li><strong class="text-white">Europaallee / HB:</strong> Google + Waymo Hauptstandort. Direkt vom Meetup (VSHNtower) erreichbar.</li>
+                        <li><strong class="text-white">Enge / Hürlimann:</strong> Zweites grosses Google-Areal – perfekt kombiniert mit Usability Night.</li>
+                        <li><strong class="text-white">Schlieren & Dübendorf:</strong> DARE (Schlieren) und Innovation Park / Empa (Dübendorf) brauchen Vorlaufzeit per S-Bahn / Bus 759. Früh starten!</li>
+                    </ul>
+                </div>
+
+                <!-- Behaviors -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="font-bold text-white text-sm mb-2 text-emerald-400 flex items-center gap-2">
+                        <i class="fa-solid fa-user-secret"></i> Scouting Verhalten & Tipps
+                    </h3>
+                    <ul class="space-y-1.5 list-disc list-inside text-slate-300">
+                        <li><strong class="text-white">Beobachtung von aussen:</strong> Cafés gegenüber Google Europaallee / Hürlimann nutzen. Open-Space Zonen scouten.</li>
+                        <li><strong class="text-white">Campus-Areale:</strong> ETH Zentrum, Innovation Park Dübendorf & Empa erlauben freie Zirkulation in öffentlichen Bereichen.</li>
+                        <li><strong class="text-white">Toni-Areal:</strong> Sehr offene Atmosphäre, top für Kreativ & Tech Interface.</li>
+                        <li><strong class="text-white">Impact Hub + Cafés:</strong> Day-Pass oder Café-Besuch (Sphères / Kraftwerk) bietet unmittelbare Community-Anbindung.</li>
+                        <li><strong class="text-white">Foto-Etikette:</strong> Fotos strictly nur im öffentlichen Raum.</li>
+                    </ul>
+                </div>
+
+                <!-- Mandatory Apps -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-white text-xs mb-1">Empfohlene Apps</h3>
+                        <p class="text-slate-400 text-[11px]">SBB Mobile (ÖV Billette & Echtzeitfahrplan) · Google Maps · Meetup</p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 font-mono text-[11px] border border-blue-500/20">SBB EasyRide</span>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 text-right">
+                <button onclick="closeModal('modal-tips')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                    Verstanden
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // Data Structure for all locations
+        const locations = [
+            // Base Hotel
+            {
+                id: 'moxy',
+                title: 'Moxy Zürich (Hotel Base)',
+                day: 'all',
+                dayLabel: 'Base Hotel',
+                time: 'Check-in Di 13:30 | Check-out Fr 11:30',
+                address: 'Badenerstrasse 537, 8048 Zürich',
+                cluster: 'Base & Logistik',
+                lat: 47.3828,
+                lng: 8.4965,
+                color: '#8b5cf6',
+                icon: 'fa-hotel',
+                focus: 'Hauptquartier für den Research Trip. Perfekte Anbindung mit Tram 2/3 Richtung Zürich-West & HB.',
+                notes: 'Gepäckaufbewahrung am Fr bis zur Abreise möglich. Direkt am Letzigrund.'
+            },
+
+            // DIENSTAG 15.09
+            {
+                id: 'vshn',
+                title: 'Cloud Native Computing Meetup (VSHNtower)',
+                day: 'di',
+                dayLabel: 'Di 15.09',
+                time: '14:30 – 18:00 (Doors 14:30, Talks 15:00)',
+                address: 'Neugasse 6, 8005 Zürich',
+                cluster: 'Community & Events',
+                lat: 47.3826,
+                lng: 8.5283,
+                color: '#3b82f6',
+                icon: 'fa-users',
+                focus: 'Cloud Native & Kubernetes Ecosystem Austria/Swiss Community.',
+                notes: 'Transfer vom Moxy ca. 15–20 Min mit Tram nach Hardbrücke/Neugasse.'
+            },
+            {
+                id: 'europaallee',
+                title: 'Europaallee / Google & Waymo',
+                day: 'di',
+                dayLabel: 'Di 15.09',
+                time: '18:15 Uhr',
+                address: 'Gustav-Gull-Platz / Europaallee 36, 8004 Zürich',
+                cluster: 'Big Tech Scouting',
+                lat: 47.3783,
+                lng: 8.5306,
+                color: '#3b82f6',
+                icon: 'fa-building-user',
+                focus: 'Gegenüber Haupteingang scouten. Waymo Switzerland GmbH & Google Campus.',
+                notes: 'Perfekt direkt nach dem Cloud Native Meetup zu Fuss erreichbar.'
+            },
+            {
+                id: 'impacthub',
+                title: 'Impact Hub Viadukt',
+                day: 'di',
+                dayLabel: 'Di 15.09',
+                time: '19:00+ Uhr',
+                address: 'Viaduktstrasse 93–95, 8005 Zürich',
+                cluster: 'Community & Events',
+                lat: 47.3872,
+                lng: 8.5222,
+                color: '#3b82f6',
+                icon: 'fa-mug-hot',
+                focus: 'Innovations- & Startup-Hub unter den Viaduktbögen. Community & Networking.',
+                notes: '5 Min von S-Bahn Hardbrücke entfernt.'
+            },
+            {
+                id: 'spheres',
+                title: 'Sphères / Kraftwerk-Cafés',
+                day: 'di',
+                dayLabel: 'Di 15.09',
+                time: '19:30+ Uhr (Abendabschluss)',
+                address: 'Hardturmstrasse 66 / Selnaustrasse 25, Zürich',
+                cluster: 'Community & Events',
+                lat: 47.3892,
+                lng: 8.5173,
+                color: '#3b82f6',
+                icon: 'fa-comments',
+                focus: 'Informelle Tech- & Gründer-Treffpunkte für spontanen Austausch.',
+                notes: 'Kraftwerk ist eine ehemalige Bankfiliale, jetzt Kreativ- & Innovation Hub.'
+            },
+
+            // MITTWOCH 16.09
+            {
+                id: 'technopark',
+                title: 'Technopark Zürich',
+                day: 'mi',
+                dayLabel: 'Mi 16.09',
+                time: '09:00 – 10:30 Uhr',
+                address: 'Technoparkstrasse 1, 8005 Zürich',
+                cluster: 'Deep Tech',
+                lat: 47.3896,
+                lng: 8.5158,
+                color: '#10b981',
+                icon: 'fa-microchip',
+                focus: '250+ High-Tech Firmen, AI Startup Center, ETH-Spin-offs.',
+                notes: 'Erreichbar mit Tram 4 / 8 / 17. Öffentlicher Innenhof & Foyer frei zugänglich.'
+            },
+            {
+                id: 'toni',
+                title: 'Toni-Areal / ZHdK',
+                day: 'mi',
+                dayLabel: 'Mi 16.09',
+                time: '10:45 – 11:45 Uhr',
+                address: 'Pfingstweidstrasse 96, 8005 Zürich',
+                cluster: 'Deep Tech',
+                lat: 47.3908,
+                lng: 8.5113,
+                color: '#10b981',
+                icon: 'fa-palette',
+                focus: 'Schnittstelle Kreativwirtschaft, Interaction Design & Tech-Startups.',
+                notes: 'Direkt neben dem Technopark. Öffentliche Kaskadentreppe & Hallen.'
+            },
+            {
+                id: 'hubertus',
+                title: 'Lunch Café Hubertus',
+                day: 'mi',
+                dayLabel: 'Mi 16.09',
+                time: '12:00 – 13:00 Uhr',
+                address: 'Letzigraben 101, 8003 Zürich',
+                cluster: 'Base & Logistik',
+                lat: 47.3756,
+                lng: 8.5027,
+                color: '#10b981',
+                icon: 'fa-utensils',
+                focus: 'Geplante Mittagspause nahe Hotel / Albisrieden.',
+                notes: 'Gute Schweizer Küche in entspannter Atmosphäre.'
+            },
+            {
+                id: 'on-hardturm',
+                title: 'On Labs / Flagship Hardturm',
+                day: 'mi',
+                dayLabel: 'Mi 16.09',
+                time: '13:15 – 13:45 Uhr',
+                address: 'Hardturmstrasse 183, 8005 Zürich',
+                cluster: 'PerformanceTech',
+                lat: 47.3923,
+                lng: 8.5082,
+                color: '#10b981',
+                icon: 'fa-shoe-prints',
+                focus: 'PerformanceTech & Innovation Lab von On Running. HQ-Cluster.',
+                notes: 'Kurzer Scouting Stop vor der Weiterfahrt nach Schlieren.'
+            },
+            {
+                id: 'dare',
+                title: 'DARE Campus Schlieren (The JED)',
+                day: 'mi',
+                dayLabel: 'Mi 16.09',
+                time: '14:00 – 16:30 Uhr',
+                address: 'Zürcherstrasse 39D, 8952 Schlieren',
+                cluster: 'Deep Tech',
+                lat: 47.3986,
+                lng: 8.4552,
+                color: '#10b981',
+                icon: 'fa-robot',
+                focus: 'Deep Tech / AI / Robotics Hub in ehemaliger Druckerei.',
+                notes: 'Areal frei begehbar. Gastronomie & Tech-Spaces vor Ort scouten.'
+            },
+
+            // DONNERSTAG 17.09
+            {
+                id: 'solar',
+                title: 'Solar & Storage Live Zurich (Messe)',
+                day: 'do',
+                dayLabel: 'Do 17.09',
+                time: '09:30 – 12:00 Uhr (Ticket Slot 10-12)',
+                address: 'Wallisellenstrasse 49, 8050 Zürich (Messe)',
+                cluster: 'Cleantech / Energy',
+                lat: 47.4115,
+                lng: 8.5512,
+                color: '#f59e0b',
+                icon: 'fa-solar-panel',
+                focus: 'Energy / Cleantech / Battery Storage Technologies.',
+                notes: 'S-Bahn bis Oerlikon oder Tram 11 bis Messe/Hallenstadion.'
+            },
+            {
+                id: 'eth',
+                title: 'ETH Zentrum & Polyterrasse',
+                day: 'do',
+                dayLabel: 'Do 17.09',
+                time: '12:30 – 13:45 Uhr',
+                address: 'Rämistrasse 101, 8092 Zürich',
+                cluster: 'Deep Tech',
+                lat: 47.3763,
+                lng: 8.5477,
+                color: '#f59e0b',
+                icon: 'fa-graduation-cap',
+                focus: 'Europas führende Tech-Universität, Hauptgebäude & Polyterrasse.',
+                notes: 'Öffentliche Bereiche, Bibliothek, Dozentenfoyer & Cafés frei zugänglich.'
+            },
+            {
+                id: 'on-limmatquai',
+                title: 'On Flagship Limmatquai',
+                day: 'do',
+                dayLabel: 'Do 17.09',
+                time: '14:00 – 15:15 Uhr',
+                address: 'Limmatquai 28, 8001 Zürich',
+                cluster: 'PerformanceTech',
+                lat: 47.3688,
+                lng: 8.5435,
+                color: '#f59e0b',
+                icon: 'fa-store',
+                focus: 'Neuer City-Flagship Store mit neuester Footwear/Wearable-Tech.',
+                notes: 'Direkt an der Limmat im Herzen der Altstadt.'
+            },
+            {
+                id: 'huerlimann',
+                title: 'Hürlimann-Areal (Google Cluster)',
+                day: 'do',
+                dayLabel: 'Do 17.09',
+                time: '15:30 – 16:45 Uhr',
+                address: 'Brandschenkestrasse 110, 8002 Zürich',
+                cluster: 'Big Tech Scouting',
+                lat: 47.3644,
+                lng: 8.5289,
+                color: '#f59e0b',
+                icon: 'fa-google',
+                focus: 'Zweites grosses Google Entwicklungszentrum in Zürich.',
+                notes: 'Ehemalige Brauerei, spektakulärer Architektur-Mix. Areal frei begehbar.'
+            },
+            {
+                id: 'usability',
+                title: 'Swiss Usability Night (Xebia)',
+                day: 'do',
+                dayLabel: 'Do 17.09',
+                time: '17:30 – 20:30 Uhr',
+                address: 'Talstrasse 41, 8001 Zürich (nahe Paradeplatz)',
+                cluster: 'Community & Events',
+                lat: 47.3698,
+                lng: 8.5365,
+                color: '#f59e0b',
+                icon: 'fa-laptop-code',
+                focus: 'UX, Human-Centered Design & Tech Community Meetup.',
+                notes: 'Veranstalter Xebia Switzerland. Nahe Paradeplatz.'
+            },
+
+            // FREITAG 18.09
+            {
+                id: 'innovation-park',
+                title: 'Switzerland Innovation Park Zurich',
+                day: 'fr',
+                dayLabel: 'Fr 18.09',
+                time: '08:00 – 10:00 Uhr',
+                address: 'Flugplatz Dübendorf, 8600 Dübendorf',
+                cluster: 'Deep Tech',
+                lat: 47.3925,
+                lng: 8.6433,
+                color: '#ec4899',
+                icon: 'fa-rocket',
+                focus: 'Robotics, Space Tech, Advanced Manufacturing & ETH Hangar.',
+                notes: 'Anreise per S-Bahn bis Dübendorf + Bus 759. Früh starten!'
+            },
+            {
+                id: 'empa',
+                title: 'Empa Dübendorf',
+                day: 'fr',
+                dayLabel: 'Fr 18.09',
+                time: '10:15 – 11:00 Uhr',
+                address: 'Ueberlandstrasse 129, 8600 Dübendorf',
+                cluster: 'Deep Tech',
+                lat: 47.4042,
+                lng: 8.6094,
+                color: '#ec4899',
+                icon: 'fa-flask',
+                focus: 'Eidgenössische Materialprüfungs- und Forschungsanstalt.',
+                notes: 'Direkt neben dem Innovation Park – ideal in Kombination.'
+            },
+            {
+                id: 'airport',
+                title: 'Flughafen Zürich (Abflug)',
+                day: 'fr',
+                dayLabel: 'Fr 18.09',
+                time: '15:30 Transfer | 17:10 Boarding',
+                address: '8058 Kloten',
+                cluster: 'Base & Logistik',
+                lat: 47.4581,
+                lng: 8.5555,
+                color: '#ec4899',
+                icon: 'fa-plane-departure',
+                focus: 'Heimreise. Direkt per Tram 10 oder S-Bahn erreichbar.',
+                notes: 'Check-out Moxy spätestens 11:30. Pufferzeit flexibel nutzbar.'
+            }
+        ];
+
+        // Global State
+        let map;
+        let markers = {};
+        let routePolylines = {};
+        let activeDay = 'all';
+        let showRoutes = true;
+
+        // Route definitions by Day
+        const dailyRoutes = {
+            'di': ['moxy', 'vshn', 'europaallee', 'impacthub', 'spheres'],
+            'mi': ['moxy', 'technopark', 'toni', 'hubertus', 'on-hardturm', 'dare', 'moxy'],
+            'do': ['moxy', 'solar', 'eth', 'on-limmatquai', 'huerlimann', 'usability', 'moxy'],
+            'fr': ['moxy', 'innovation-park', 'empa', 'moxy', 'airport']
+        };
+
+        const routeColors = {
+            'di': '#3b82f6',
+            'mi': '#10b981',
+            'do': '#f59e0b',
+            'fr': '#ec4899'
+        };
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            renderLocations();
+            drawRoutes();
+        });
+
+        // Initialize Leaflet Map
+        function initMap() {
+            // Center around Zurich
+            map = L.map('map', {
+                zoomControl: false
+            }).setView([47.385, 8.535], 13);
+
+            // Add Zoom Control on top right
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // Dark Mode Tiles (CartoDB Dark Matter)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Add Markers
+            locations.forEach(loc => {
+                const customIcon = L.divIcon({
+                    className: 'custom-pin',
+                    html: `
+                        <div style="background-color: ${loc.color};" class="w-8 h-8 rounded-full border-2 border-slate-900 shadow-xl flex items-center justify-center text-white text-xs hover:scale-125 transition-transform duration-200 cursor-pointer">
+                            <i class="fa-solid ${loc.icon}"></i>
+                        </div>
+                    `,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon }).addTo(map);
+
+                // Popup HTML
+                const popupContent = `
+                    <div class="p-2 max-w-xs">
+                        <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-white" style="background-color: ${loc.color}">${loc.dayLabel}</span>
+                        <h4 class="font-bold text-sm text-white mt-1.5">${loc.title}</h4>
+                        <p class="text-xs text-slate-300 mt-1"><i class="fa-regular fa-clock text-blue-400 mr-1"></i>${loc.time}</p>
+                        <p class="text-[11px] text-slate-400 mt-1"><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>${loc.address}</p>
+                        <button onclick="openLocationDetail('${loc.id}')" class="mt-2.5 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-1.5 rounded-lg border border-slate-700 font-medium transition flex items-center justify-center gap-1.5">
+                            <span>Details & Scouting Tips</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markers[loc.id] = marker;
+            });
+        }
+
+        // Draw Polylines for Routes
+        function drawRoutes() {
+            Object.keys(dailyRoutes).forEach(dayKey => {
+                const coords = dailyRoutes[dayKey].map(id => {
+                    const loc = locations.find(l => l.id === id);
+                    return [loc.lat, loc.lng];
+                });
+
+                const polyline = L.polyline(coords, {
+                    color: routeColors[dayKey],
+                    weight: 3,
+                    opacity: 0.7,
+                    dashArray: '6, 8',
+                    smoothFactor: 1
+                });
+
+                routePolylines[dayKey] = polyline;
+                if (showRoutes) {
+                    polyline.addTo(map);
+                }
+            });
+        }
+
+        // Toggle Route Visibility
+        function toggleRoutes() {
+            showRoutes = !showRoutes;
+            const btnText = document.getElementById('route-btn-text');
+            
+            Object.keys(routePolylines).forEach(dayKey => {
+                if (showRoutes && (activeDay === 'all' || activeDay === dayKey)) {
+                    routePolylines[dayKey].addTo(map);
+                } else {
+                    map.removeLayer(routePolylines[dayKey]);
+                }
+            });
+
+            btnText.innerText = showRoutes ? 'Routenlinien ausblenden' : 'Routenlinien anzeigen';
+        }
+
+        // Filter Locations by Day
+        function filterDay(day) {
+            activeDay = day;
+
+            // Update Pills UI
+            document.querySelectorAll('.day-pill').forEach(pill => {
+                pill.classList.remove('bg-blue-600', 'text-white');
+                pill.classList.add('bg-slate-800', 'text-slate-300');
+            });
+
+            const activePill = document.getElementById(`pill-${day}`);
+            if (activePill) {
+                activePill.classList.remove('bg-slate-800', 'text-slate-300');
+                activePill.classList.add('bg-blue-600', 'text-white');
+            }
+
+            renderLocations();
+
+            // Update Polylines according to day filter
+            Object.keys(routePolylines).forEach(dayKey => {
+                if (showRoutes && (day === 'all' || day === dayKey)) {
+                    routePolylines[dayKey].addTo(map);
+                } else {
+                    map.removeLayer(routePolylines[dayKey]);
+                }
+            });
+
+            // Adjust Map Bounds
+            fitMapToVisibleMarkers();
+        }
+
+        // Render Locations Sidebar List
+        function renderLocations() {
+            const listContainer = document.getElementById('locations-list');
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const catVal = document.getElementById('category-filter').value;
+
+            const filtered = locations.filter(loc => {
+                const matchesDay = (activeDay === 'all') || (loc.day === activeDay) || (loc.day === 'all');
+                const matchesSearch = loc.title.toLowerCase().includes(searchVal) || 
+                                      loc.cluster.toLowerCase().includes(searchVal) || 
+                                      loc.address.toLowerCase().includes(searchVal) ||
+                                      loc.notes.toLowerCase().includes(searchVal);
+                const matchesCat = (catVal === 'all') || (loc.cluster === catVal);
+
+                return matchesDay && matchesSearch && matchesCat;
+            });
+
+            document.getElementById('location-count').innerText = `${filtered.length} Orte angezeigt`;
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="p-8 text-center text-slate-500 text-xs">
+                        <i class="fa-solid fa-filter-circle-xmark text-2xl mb-2"></i>
+                        <p>Keine Standorte für diese Filter gefunden.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = filtered.map(loc => `
+                <div onclick="focusLocation('${loc.id}')" class="p-3.5 hover:bg-slate-800/60 cursor-pointer transition flex items-start gap-3 group">
+                    <div style="background-color: ${loc.color}20; border-color: ${loc.color}50;" class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 mt-0.5">
+                        <i class="fa-solid ${loc.icon} text-xs" style="color: ${loc.color};"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">${loc.dayLabel}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${loc.cluster}</span>
+                        </div>
+                        <h3 class="text-xs font-bold text-slate-200 mt-1 truncate group-hover:text-blue-400 transition">${loc.title}</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5 truncate"><i class="fa-regular fa-clock mr-1 text-slate-500"></i>${loc.time}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            // Also show/hide map markers based on filtered list
+            const visibleIds = filtered.map(l => l.id);
+            locations.forEach(loc => {
+                if (visibleIds.includes(loc.id)) {
+                    markers[loc.id].addTo(map);
+                } else {
+                    map.removeLayer(markers[loc.id]);
+                }
+            });
+        }
+
+        // Focus Location on Map + Open Popup
+        function focusLocation(id) {
+            const loc = locations.find(l => l.id === id);
+            if (!loc) return;
+
+            map.flyTo([loc.lat, loc.lng], 15, { duration: 1.2 });
+            markers[id].openPopup();
+        }
+
+        // Fit map bounds to currently visible markers
+        function fitMapToVisibleMarkers() {
+            const visibleCoords = locations
+                .filter(loc => (activeDay === 'all') || (loc.day === activeDay) || (loc.day === 'all'))
+                .map(loc => [loc.lat, loc.lng]);
+
+            if (visibleCoords.length > 0) {
+                const bounds = L.latLngBounds(visibleCoords);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        // Reset Map View to all Zurich
+        function resetMapView() {
+            filterDay('all');
+            document.getElementById('search-input').value = '';
+            document.getElementById('category-filter').value = 'all';
+            renderLocations();
+            map.flyTo([47.385, 8.535], 12);
+        }
+
+        // Open Modal Detail
+        function openLocationDetail(id) {
+            const loc = locations.find(l => l.id === id);
+            if (!loc) return;
+
+            document.getElementById('modal-title').innerText = loc.title;
+            document.getElementById('modal-day-badge').innerText = `${loc.dayLabel} · ${loc.cluster}`;
+            document.getElementById('modal-day-badge').style.backgroundColor = `${loc.color}30`;
+            document.getElementById('modal-day-badge').style.color = loc.color;
+
+            document.getElementById('modal-icon-bg').style.backgroundColor = loc.color;
+            document.getElementById('modal-icon').className = `fa-solid ${loc.icon}`;
+
+            document.getElementById('modal-time').innerText = loc.time;
+            document.getElementById('modal-address').innerText = loc.address;
+            document.getElementById('modal-focus').innerText = loc.focus;
+            document.getElementById('modal-notes').innerText = loc.notes;
+
+            // Direct Google Maps Link
+            const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.title + ' ' + loc.address)}`;
+            document.getElementById('modal-gmaps-link').href = gmapsUrl;
+
+            openModal('modal-detail');
+        }
+
+        // Modal Helpers
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+```eof
+
+Deine interaktive Karte für den Zürich Tech Research Trip (15. – 18. September 2026) ist fertig zusammengestellt!
+
+### Features der Karte:
+- **Tagesfilter (Di 15. – Fr 18.):** Schalte per Klick zwischen den einzelnen Forschungstagen hin und her. Die Karte zoomt automatisch auf die relevanten Orte.
+- **Routenlinien & Verbindungen:** Farbcodierte Verbindungspfade zeigen dir die geplante Tagesroute. Sie lassen sich oben rechts ein- oder ausblenden.
+- **Such- & Cluster-Filter:** Durchsuche die Agenda live nach Orten, Adressen oder Clustern (z.B. *Deep Tech*, *Big Tech*, *PerformanceTech*).
+- **Detailansicht & Scouting-Tipps:** Klickst du auf einen Marker oder Listeneintrag, öffnet sich das Infofenster mit exakten Uhrzeiten, Logistikhinweisen und einem Direktlink zur Navigation in Google Maps.
+- **Scouting-Checkliste:** Über den Button **"Scouting & Logistik-Tipps"** im Header kannst du jederzeit die Verhaltensregeln, Campus-Zugangstipps und ÖV-Hinweise abrufen.
